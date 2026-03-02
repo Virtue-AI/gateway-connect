@@ -1,17 +1,26 @@
 {
   "name": "@virtue-ai/gateway-connect",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One-command setup to connect OpenClaw to VirtueAI MCP gateway",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
   "bin": {
-    "gateway-connect": "./dist/index.js"
+    "gateway-connect": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts"
   },
-  "keywords": ["openclaw", "mcp", "gateway", "virtueai"],
+  "keywords": [
+    "openclaw",
+    "mcp",
+    "gateway",
+    "virtueai"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.0",
