@@ -21,6 +21,8 @@ import os from 'os';
 import path from 'path';
 import { URL } from 'url';
 
+import { generateTrajectoryPlugin, enableTrajectoryPlugin } from './trajectory-plugin.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -270,10 +272,10 @@ async function authenticate(gatewayUrl: string): Promise<{
 // Step 2: Write MCP gateway config
 // ---------------------------------------------------------------------------
 
-function writeMcpConfig(gatewayUrl: string, accessToken: string): void {
+function writeMcpConfig(gatewayUrl: string, accessToken: string, guardUuid?: string): void {
   fs.mkdirSync(OPENCLAW_DIR, { recursive: true });
 
-  const config = {
+  const config: any = {
     mcpServers: {
       virtueai: {
         type: 'http',
@@ -282,6 +284,10 @@ function writeMcpConfig(gatewayUrl: string, accessToken: string): void {
           Authorization: `Bearer ${accessToken}`,
         },
       },
+    },
+    trajectory: {
+      gatewayUrl,
+      guardUuid: guardUuid || process.env.VIRTUEAI_GUARD_UUID || '',
     },
   };
 
@@ -403,19 +409,22 @@ Usage:
   npx @virtue-ai/gateway-connect [options]
 
 Options:
-  --gateway-url <url>  Gateway URL (default: ${DEFAULT_GATEWAY_URL})
-  --help               Show this help message
+  --gateway-url <url>    Gateway URL (default: ${DEFAULT_GATEWAY_URL})
+  --guard-uuid <uuid>    Guard UUID for trajectory recording (or set VIRTUEAI_GUARD_UUID)
+  --help                 Show this help message
 
 What it does:
   1. Opens browser for OAuth login
   2. Saves MCP config to ~/.openclaw/mcp-gateway.json
   3. Patches ~/.openclaw/openclaw.json to use the gateway
-  4. Verifies connection by listing available tools
+  4. Installs trajectory plugin for full session recording
+  5. Verifies connection by listing available tools
 `);
     process.exit(0);
   }
 
   let gatewayUrl = getArg('gateway-url') || DEFAULT_GATEWAY_URL;
+  const guardUuid = getArg('guard-uuid') || process.env.VIRTUEAI_GUARD_UUID;
   // Strip /mcp suffix and normalize to lowercase
   gatewayUrl = gatewayUrl.replace(/\/mcp\/?$/, '').toLowerCase();
 
@@ -427,12 +436,17 @@ What it does:
 
   // Step 2: Write MCP config
   console.log('\n  Configuring OpenClaw...');
-  writeMcpConfig(gatewayUrl, accessToken);
+  writeMcpConfig(gatewayUrl, accessToken, guardUuid);
 
   // Step 3: Patch openclaw.json
   patchOpenClawConfig();
 
-  // Step 4: Verify
+  // Step 4: Install trajectory plugin
+  console.log('\n  Setting up trajectory recording...');
+  generateTrajectoryPlugin(guardUuid);
+  enableTrajectoryPlugin();
+
+  // Step 5: Verify
   console.log('');
   const toolCount = await verifyConnection(gatewayUrl, accessToken);
 
@@ -440,6 +454,7 @@ What it does:
   console.log(`
   Done! OpenClaw is now connected to VirtueAI MCP gateway.
   ${toolCount} tools available across the gateway.
+  Trajectory recording enabled (via virtueai-trajectory plugin).
 
   Config files:
     ${MCP_CONFIG_PATH}

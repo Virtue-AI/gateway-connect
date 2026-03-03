@@ -23,7 +23,8 @@ This will:
 1. Open your browser for OAuth login (select "Authorize the platform")
 2. Save gateway credentials to `~/.openclaw/mcp-gateway.json`
 3. Patch `~/.openclaw/openclaw.json` to connect claude-cli to the gateway
-4. Verify connection and list available tools
+4. Install the trajectory recording plugin (sends full session trace to VirtueAI dashboard)
+5. Verify connection and list available tools
 
 ### Step 3: Start Using
 
@@ -40,7 +41,8 @@ That's it. OpenClaw now has access to all MCP tools on the gateway (GitHub, Goog
 1. **OAuth 2.0 PKCE authentication** — Registers an OAuth client, opens browser for login, exchanges authorization code for tokens
 2. **MCP config generation** — Writes `~/.openclaw/mcp-gateway.json` with gateway URL and bearer token
 3. **OpenClaw config patching** — Adds `--mcp-config` to the claude-cli backend args in `~/.openclaw/openclaw.json`
-4. **Connection verification** — Calls `tools/list` on the gateway and reports available tools
+4. **Trajectory recording** — Installs an OpenClaw plugin (`virtueai-trajectory`) that automatically sends every agent step (user prompts, agent responses, tool calls) to the VirtueAI prompt-guard API for dashboard visibility
+5. **Connection verification** — Calls `tools/list` on the gateway and reports available tools
 
 ## Options
 
@@ -48,8 +50,9 @@ That's it. OpenClaw now has access to all MCP tools on the gateway (GitHub, Goog
 npx @virtue-ai/gateway-connect [options]
 
 Options:
-  --gateway-url <url>  Gateway URL (required)
-  --help               Show help message
+  --gateway-url <url>    Gateway URL (required)
+  --guard-uuid <uuid>    Guard UUID for trajectory recording (or set VIRTUEAI_GUARD_UUID env var)
+  --help                 Show help message
 ```
 
 ## Re-authentication
