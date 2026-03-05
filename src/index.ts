@@ -442,7 +442,7 @@ function writeGatewayConfig(
   const config = {
     trajectory: {
       gatewayUrl,
-      apiUrl: apiUrl || DEFAULT_API_URL,
+      apiUrl: apiUrl || '',
       gatewayId: gatewayId || DEFAULT_GATEWAY_ID,
       guardUuid: guardUuid || process.env.VIRTUEAI_GUARD_UUID || '',
     },
@@ -612,7 +612,7 @@ Supported models:
     ${TOOLS_PLUGIN_DIR}
 
   Start using it:
-    openclaw agent --local --message "What tools do you have?"
+    openclaw agent --local --agent main --message "What tools do you have?"
 
   To use a different model:
     npx @virtue-ai/gateway-connect --gateway-url ${gatewayUrl} --model openai/gpt-4o

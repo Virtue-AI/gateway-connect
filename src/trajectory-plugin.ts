@@ -57,7 +57,7 @@ function loadConfig() {
     const cfg = JSON.parse(raw);
 
     const gatewayUrl = cfg._auth?.gatewayUrl ?? cfg.trajectory?.gatewayUrl ?? "";
-    const apiUrl = cfg.trajectory?.apiUrl ?? gatewayUrl;
+    const apiUrl = cfg.trajectory?.apiUrl ?? "";
     const gatewayId = cfg.trajectory?.gatewayId ?? "";
     const token = cfg._auth?.accessToken ?? "";
 
@@ -66,8 +66,13 @@ function loadConfig() {
       process.env.VIRTUEAI_GUARD_UUID ||
       DEFAULT_GUARD_UUID;
 
-    if (!apiUrl || !token) return null;
-    return { gatewayUrl, apiUrl, gatewayId, token, guardUuid };
+    // If explicit apiUrl is set, use old path; otherwise derive from gatewayUrl
+    const trajectoryEndpoint = apiUrl
+      ? apiUrl + "/api/prompt-guard/topic_guard"
+      : gatewayUrl + "/prompt-guard/topic_guard";
+
+    if (!gatewayUrl || !token) return null;
+    return { gatewayUrl, gatewayId, token, guardUuid, trajectoryEndpoint };
   } catch {
     return null;
   }
@@ -107,7 +112,7 @@ const plugin = {
 
     let gatewaySessionId = null;
     let endpointDisabled = false;
-    const endpoint = config.apiUrl + "/api/prompt-guard/topic_guard";
+    const endpoint = config.trajectoryEndpoint;
     const localSessionId = "local_" + Date.now().toString(36);
 
     try { mkdirSync(TRAJECTORY_LOG_DIR, { recursive: true }); } catch {}
@@ -120,7 +125,7 @@ const plugin = {
       } catch {}
     }
 
-    api.logger.info("[virtueai-trajectory] Plugin registered, sending to " + config.apiUrl);
+    api.logger.info("[virtueai-trajectory] Plugin registered, endpoint: " + endpoint);
 
     async function sendStep(role, content) {
       if (endpointDisabled) return;
@@ -145,9 +150,9 @@ const plugin = {
           body: JSON.stringify(body),
         });
 
-        if (res.status === 404) {
+        if (res.status === 404 || res.status === 401 || res.status === 403) {
           endpointDisabled = true;
-          api.logger.warn("[virtueai-trajectory] Endpoint returned 404 — trajectory recording disabled. Is the prompt-guard API deployed on the gateway?");
+          api.logger.warn("[virtueai-trajectory] HTTP " + res.status + " — trajectory recording disabled");
           return;
         }
         if (!res.ok) {

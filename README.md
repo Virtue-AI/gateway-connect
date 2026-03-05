@@ -43,7 +43,7 @@ This will:
 One-shot mode:
 
 ```bash
-openclaw agent --local --message "What tools do you have?"
+openclaw agent --local --agent main --message "What tools do you have?"
 ```
 
 Interactive TUI mode:
