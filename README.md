@@ -63,7 +63,7 @@ openclaw gateway stop
 In TUI mode, use slash commands to switch models on the fly:
 
 ```
-/model openai/gpt-4o
+/model openai/gpt-5.2
 /model anthropic/claude-opus-4-6
 /models                              # opens model picker
 ```

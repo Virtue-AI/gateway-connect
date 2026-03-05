@@ -79,6 +79,19 @@ function truncate(s, max = 2000) {
   return s.length > max ? s.slice(0, max) + "..." : s;
 }
 
+/**
+ * Strip OpenClaw's sender metadata prefix from the raw prompt.
+ * The prompt arrives as:
+ *   Sender (untrusted metadata):\\n{json}\\n\\n[timestamp] actual message
+ * We want just "actual message".
+ */
+function stripSenderMetadata(prompt) {
+  if (!prompt || typeof prompt !== "string") return prompt;
+  // Match the "Sender (untrusted metadata):" block + JSON + timestamp prefix
+  const match = prompt.match(/^Sender \\(untrusted metadata\\):[\\s\\S]*?\\n\\n(?:\\[.*?\\]\\s*)?(.*)$/s);
+  return match ? match[1].trim() : prompt.trim();
+}
+
 const plugin = {
   id: "${PLUGIN_ID}",
   name: "VirtueAI Trajectory",
@@ -140,34 +153,40 @@ const plugin = {
       }
     }
 
-    // Hook: user prompt sent to LLM
     api.on("llm_input", (event) => {
-      if (event.prompt) {
-        sendStep("user", event.prompt);
+      const cleaned = stripSenderMetadata(event.prompt);
+      api.logger.info("[virtueai-trajectory] llm_input fired, prompt=" + (cleaned ?? "").slice(0, 80));
+      if (cleaned) {
+        sendStep("user", cleaned);
       }
     });
 
-    // Hook: LLM response received
     api.on("llm_output", (event) => {
+      api.logger.info("[virtueai-trajectory] llm_output fired, assistantTexts.length=" + (event.assistantTexts?.length ?? "undefined") + ", keys=" + Object.keys(event).join(","));
       const text = (event.assistantTexts ?? []).join("\\n").trim();
       if (text) {
+        api.logger.info("[virtueai-trajectory] llm_output sending agent text, len=" + text.length);
         sendStep("agent", text);
+      } else {
+        api.logger.warn("[virtueai-trajectory] llm_output fired but assistantTexts empty");
       }
     });
 
-    // Hook: tool call completed
     api.on("after_tool_call", (event) => {
-      const params = event.params
+      api.logger.info("[virtueai-trajectory] after_tool_call fired, tool=" + event.toolName);
+      const toolParams = event.params
         ? Object.entries(event.params)
             .map(([k, v]) => k + "=" + JSON.stringify(v))
             .join(", ")
         : "";
-      const callStr = event.toolName + "(" + params + ")";
+      const callStr = event.toolName + "(" + toolParams + ")";
       const resultStr = event.result != null ? truncate(event.result, 500) : (event.error ?? "no result");
       sendStep("agent", callStr + " → " + resultStr);
     });
 
-    api.logger.info("[virtueai-trajectory] Plugin registered, sending to " + config.gatewayUrl);
+    api.on("agent_end", (event) => {
+      api.logger.info("[virtueai-trajectory] agent_end fired, success=" + event.success + ", durationMs=" + event.durationMs);
+    });
   },
 };
 
