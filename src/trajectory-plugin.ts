@@ -66,10 +66,8 @@ function loadConfig() {
       process.env.VIRTUEAI_GUARD_UUID ||
       DEFAULT_GUARD_UUID;
 
-    // If explicit apiUrl is set, use old path; otherwise derive from gatewayUrl
-    const trajectoryEndpoint = apiUrl
-      ? apiUrl + "/api/prompt-guard/topic_guard"
-      : gatewayUrl + "/prompt-guard/topic_guard";
+    const trajectoryBase = apiUrl || gatewayUrl;
+    const trajectoryEndpoint = trajectoryBase + "/prompt-guard/topic_guard";
 
     if (!gatewayUrl || !token) return null;
     return { gatewayUrl, gatewayId, token, guardUuid, trajectoryEndpoint };
