@@ -54,20 +54,19 @@ function loadConfig() {
   try {
     const raw = readFileSync(MCP_CONFIG_PATH, "utf-8");
     const cfg = JSON.parse(raw);
-    const virtueai = cfg.mcpServers?.virtueai;
-    if (!virtueai) return null;
 
-    const authHeader = virtueai.headers?.Authorization ?? "";
-    const token = authHeader.replace(/^Bearer\\s+/i, "");
-    const gatewayUrl = (virtueai.url ?? "").replace(/\\/mcp\\/?$/, "");
+    const gatewayUrl = cfg._auth?.gatewayUrl ?? cfg.trajectory?.gatewayUrl ?? "";
+    const apiUrl = cfg.trajectory?.apiUrl ?? gatewayUrl;
+    const gatewayId = cfg.trajectory?.gatewayId ?? "";
+    const token = cfg._auth?.accessToken ?? "";
 
     const guardUuid =
       cfg.trajectory?.guardUuid ||
       process.env.VIRTUEAI_GUARD_UUID ||
       DEFAULT_GUARD_UUID;
 
-    if (!gatewayUrl || !token) return null;
-    return { gatewayUrl, token, guardUuid };
+    if (!apiUrl || !token) return null;
+    return { gatewayUrl, apiUrl, gatewayId, token, guardUuid };
   } catch {
     return null;
   }
@@ -93,12 +92,18 @@ const plugin = {
     }
 
     let gatewaySessionId = null;
-    const endpoint = config.gatewayUrl + "/api/prompt-guard/topic_guard";
+    let endpointDisabled = false;
+    const endpoint = config.apiUrl + "/api/prompt-guard/topic_guard";
+
+    api.logger.info("[virtueai-trajectory] Plugin registered, sending to " + config.gatewayUrl);
 
     async function sendStep(role, content) {
+      if (endpointDisabled) return;
+
       const body = {
         user_prompt: truncate(content),
         guard_uuid: config.guardUuid,
+        gateway_id: config.gatewayId,
         role,
       };
       if (gatewaySessionId) {
@@ -114,8 +119,18 @@ const plugin = {
           },
           body: JSON.stringify(body),
         });
-        const data = await res.json();
 
+        if (res.status === 404) {
+          endpointDisabled = true;
+          api.logger.warn("[virtueai-trajectory] Endpoint returned 404 — trajectory recording disabled. Is the prompt-guard API deployed on the gateway?");
+          return;
+        }
+        if (!res.ok) {
+          api.logger.warn("[virtueai-trajectory] HTTP " + res.status + " from gateway");
+          return;
+        }
+
+        const data = await res.json();
         if (data?.session_id && !gatewaySessionId) {
           gatewaySessionId = data.session_id;
           api.logger.info("[virtueai-trajectory] Gateway session: " + gatewaySessionId);
@@ -172,7 +187,7 @@ export function generateTrajectoryPlugin(guardUuid?: string): void {
 
   // package.json
   const pkg = {
-    name: '@virtue-ai/trajectory',
+    name: '@virtue-ai/virtueai-trajectory',
     version: '1.0.0',
     type: 'module',
     openclaw: {
@@ -180,6 +195,16 @@ export function generateTrajectoryPlugin(guardUuid?: string): void {
     },
   };
   fs.writeFileSync(path.join(PLUGIN_DIR, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+
+  // openclaw.plugin.json (manifest required by OpenClaw)
+  const manifest = {
+    id: PLUGIN_ID,
+    name: 'VirtueAI Trajectory',
+    description: 'Sends agent trajectory steps to VirtueAI gateway for dashboard visibility',
+    version: '1.0.0',
+    configSchema: {},
+  };
+  fs.writeFileSync(path.join(PLUGIN_DIR, 'openclaw.plugin.json'), JSON.stringify(manifest, null, 2) + '\n');
 
   // index.ts (the actual plugin)
   fs.writeFileSync(path.join(PLUGIN_DIR, 'index.ts'), buildPluginSource());

@@ -1,6 +1,6 @@
 # @virtue-ai/gateway-connect
 
-One-command setup to connect [OpenClaw](https://github.com/openclaw/openclaw) to the VirtueAI MCP gateway.
+One-command setup to connect [OpenClaw](https://github.com/openclaw/openclaw) to the VirtueAI MCP gateway. Works with **any model** — Anthropic, OpenAI, Google, LiteLLM, etc.
 
 ## Quick Start
 
@@ -10,9 +10,17 @@ One-command setup to connect [OpenClaw](https://github.com/openclaw/openclaw) to
 npm install -g openclaw@latest
 ```
 
-Make sure you have [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (`claude` command should work).
+### Step 2: Configure Model Auth
 
-### Step 2: Connect to VirtueAI MCP Gateway
+Set up API key for your preferred model provider:
+
+```bash
+openclaw models auth paste-token --provider anthropic
+# or
+openclaw models auth paste-token --provider openai
+```
+
+### Step 3: Connect to VirtueAI MCP Gateway
 
 ```bash
 npx @virtue-ai/gateway-connect --gateway-url https://virtueai-agent-gtw-xxxx.ngrok.io
@@ -20,29 +28,62 @@ npx @virtue-ai/gateway-connect --gateway-url https://virtueai-agent-gtw-xxxx.ngr
 
 This will:
 
-1. Open your browser for OAuth login (select "Authorize the platform")
-2. Save gateway credentials to `~/.openclaw/mcp-gateway.json`
-3. Patch `~/.openclaw/openclaw.json` to connect claude-cli to the gateway
-4. Install the trajectory recording plugin (sends full session trace to VirtueAI dashboard)
-5. Verify connection and list available tools
+1. Open your browser for OAuth login
+2. Fetch all MCP tools from the gateway
+3. Generate a native OpenClaw plugin wrapping each tool (`~/.openclaw/extensions/virtueai-mcp-tools/`)
+4. Patch `~/.openclaw/openclaw.json` to enable the plugin
+5. Install the trajectory recording plugin
 
-### Step 3: Start Using
+### Step 4: Start Using
+
+One-shot mode:
 
 ```bash
-openclaw agent --local --session-id demo --message "What tools do you have?"
+openclaw agent --local --message "What tools do you have?"
 ```
 
-That's it. OpenClaw now has access to all MCP tools on the gateway (GitHub, Google Workspace, Gmail, Calendar, Slack, PayPal, HR, Firebase, BigQuery, Brave Search, Chrome DevTools, and more).
+Interactive TUI mode:
+
+```bash
+# Terminal 1: start the OpenClaw gateway
+openclaw gateway --allow-unconfigured
+
+# Terminal 2: open the TUI
+openclaw tui
+```
+
+To stop the gateway, press `Ctrl+C` in Terminal 1, or run:
+
+```bash
+openclaw gateway stop
+```
+
+### Switching Models
+
+In TUI mode, use slash commands to switch models on the fly:
+
+```
+/model openai/gpt-4o
+/model anthropic/claude-opus-4-6
+/models                              # opens model picker
+```
+
+All gateway tools remain available regardless of which model you use. Any model with a configured API key can be selected.
 
 ## What It Does
 
-`gateway-connect` automates the following:
+`gateway-connect` generates a **native OpenClaw plugin** that registers every MCP gateway tool via `api.registerTool()`. Each tool call is proxied to the gateway as a JSON-RPC `tools/call` request with Bearer auth.
 
-1. **OAuth 2.0 PKCE authentication** — Registers an OAuth client, opens browser for login, exchanges authorization code for tokens
-2. **MCP config generation** — Writes `~/.openclaw/mcp-gateway.json` with gateway URL and bearer token
-3. **OpenClaw config patching** — Adds `--mcp-config` to the claude-cli backend args in `~/.openclaw/openclaw.json`
-4. **Trajectory recording** — Installs an OpenClaw plugin (`virtueai-trajectory`) that automatically sends every agent step (user prompts, agent responses, tool calls) to the VirtueAI prompt-guard API for dashboard visibility
-5. **Connection verification** — Calls `tools/list` on the gateway and reports available tools
+This approach works with any embedded model provider (not just Claude CLI), because the tools are part of OpenClaw's plugin system rather than being passed via `--mcp-config`.
+
+### Generated Files
+
+| Path | Purpose |
+|------|---------|
+| `~/.openclaw/extensions/virtueai-mcp-tools/` | Native plugin with all gateway tools |
+| `~/.openclaw/extensions/virtueai-trajectory/` | Trajectory recording plugin |
+| `~/.openclaw/mcp-gateway.json` | Auth & trajectory config |
+| `~/.openclaw/openclaw.json` | Patched with plugin entries |
 
 ## Options
 
@@ -50,14 +91,15 @@ That's it. OpenClaw now has access to all MCP tools on the gateway (GitHub, Goog
 npx @virtue-ai/gateway-connect [options]
 
 Options:
-  --gateway-url <url>    Gateway URL (required)
-  --guard-uuid <uuid>    Guard UUID for trajectory recording (or set VIRTUEAI_GUARD_UUID env var)
+  --gateway-url <url>    Gateway URL (default: https://virtueai-agent-gtw-l3phon63.ngrok.io)
+  --model <model>        Model to use (e.g. openai/gpt-4o, anthropic/claude-sonnet-4-5)
+  --guard-uuid <uuid>    Guard UUID for trajectory recording (or set VIRTUEAI_GUARD_UUID)
   --help                 Show help message
 ```
 
 ## Re-authentication
 
-If your token expires, just run the command again. It will update the existing config files.
+If your token expires, just run the command again. It will regenerate the plugin with a fresh token.
 
 ## License
 
