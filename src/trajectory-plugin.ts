@@ -33,7 +33,7 @@ const DEFAULT_GUARD_UUID =
 
 function buildPluginSource(): string {
   return `\
-import { readFileSync } from "fs";
+import { readFileSync, appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -47,6 +47,7 @@ import { homedir } from "os";
  */
 
 const MCP_CONFIG_PATH = join(homedir(), ".openclaw", "mcp-gateway.json");
+const TRAJECTORY_LOG_DIR = join(homedir(), ".openclaw", "logs", "trajectory");
 const DEFAULT_GUARD_UUID =
   "${DEFAULT_GUARD_UUID}";
 
@@ -107,8 +108,19 @@ const plugin = {
     let gatewaySessionId = null;
     let endpointDisabled = false;
     const endpoint = config.apiUrl + "/api/prompt-guard/topic_guard";
+    const localSessionId = "local_" + Date.now().toString(36);
 
-    api.logger.info("[virtueai-trajectory] Plugin registered, sending to " + config.gatewayUrl);
+    try { mkdirSync(TRAJECTORY_LOG_DIR, { recursive: true }); } catch {}
+
+    function writeLocal(role, content) {
+      try {
+        const entry = { timestamp: new Date().toISOString(), session_id: gatewaySessionId || localSessionId, role, content };
+        const logFile = join(TRAJECTORY_LOG_DIR, (gatewaySessionId || localSessionId) + ".jsonl");
+        appendFileSync(logFile, JSON.stringify(entry) + "\\n");
+      } catch {}
+    }
+
+    api.logger.info("[virtueai-trajectory] Plugin registered, sending to " + config.apiUrl);
 
     async function sendStep(role, content) {
       if (endpointDisabled) return;
@@ -154,9 +166,13 @@ const plugin = {
     }
 
     api.on("llm_input", (event) => {
+      if (event.systemPrompt) {
+        writeLocal("system", event.systemPrompt);
+      }
       const cleaned = stripSenderMetadata(event.prompt);
       api.logger.info("[virtueai-trajectory] llm_input fired, prompt=" + (cleaned ?? "").slice(0, 80));
       if (cleaned) {
+        writeLocal("user", cleaned);
         sendStep("user", cleaned);
       }
     });
@@ -166,6 +182,7 @@ const plugin = {
       const text = (event.assistantTexts ?? []).join("\\n").trim();
       if (text) {
         api.logger.info("[virtueai-trajectory] llm_output sending agent text, len=" + text.length);
+        writeLocal("agent", text);
         sendStep("agent", text);
       } else {
         api.logger.warn("[virtueai-trajectory] llm_output fired but assistantTexts empty");
@@ -181,6 +198,7 @@ const plugin = {
         : "";
       const callStr = event.toolName + "(" + toolParams + ")";
       const resultStr = event.result != null ? truncate(event.result, 500) : (event.error ?? "no result");
+      writeLocal("tool", callStr + " → " + resultStr);
       sendStep("agent", callStr + " → " + resultStr);
     });
 
