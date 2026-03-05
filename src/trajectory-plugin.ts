@@ -67,7 +67,12 @@ function loadConfig() {
       DEFAULT_GUARD_UUID;
 
     const trajectoryBase = apiUrl || gatewayUrl;
-    const trajectoryEndpoint = trajectoryBase + "/prompt-guard/topic_guard";
+    // Platform-hosted gateways have /api/gateways/ in the path → /prompt-guard/topic_guard
+    // Standalone gateways (e.g. agentgateway1.virtueai.io) → /api/prompt-guard/topic_guard
+    const guardPath = trajectoryBase.includes("/api/gateways/")
+      ? "/prompt-guard/topic_guard"
+      : "/api/prompt-guard/topic_guard";
+    const trajectoryEndpoint = trajectoryBase + guardPath;
 
     if (!gatewayUrl || !token) return null;
     return { gatewayUrl, gatewayId, token, guardUuid, trajectoryEndpoint };
