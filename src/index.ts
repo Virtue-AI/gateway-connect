@@ -565,8 +565,8 @@ Supported models:
   let gatewayUrl = getArg('gateway-url') || DEFAULT_GATEWAY_URL;
   const model = getArg('model');
   const guardUuid = getArg('guard-uuid') || process.env.VIRTUEAI_GUARD_UUID;
-  const apiUrl = getArg('api-url') || DEFAULT_API_URL;
-  const gatewayId = getArg('gateway-id') || DEFAULT_GATEWAY_ID;
+  const apiUrl = getArg('api-url') || '';
+  const gatewayId = getArg('gateway-id') || '';
   gatewayUrl = gatewayUrl.replace(/\/mcp\/?$/, '').toLowerCase();
 
   console.log('\n  VirtueAI Gateway Connect\n');
