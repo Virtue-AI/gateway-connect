@@ -115,7 +115,7 @@ const plugin = {
     function writeLocal(role, content) {
       try {
         const entry = { timestamp: new Date().toISOString(), session_id: gatewaySessionId || localSessionId, role, content };
-        const logFile = join(TRAJECTORY_LOG_DIR, (gatewaySessionId || localSessionId) + ".jsonl");
+        const logFile = join(TRAJECTORY_LOG_DIR, localSessionId + ".jsonl");
         appendFileSync(logFile, JSON.stringify(entry) + "\\n");
       } catch {}
     }
