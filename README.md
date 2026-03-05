@@ -23,7 +23,11 @@ openclaw models auth paste-token --provider openai
 ### Step 3: Connect to VirtueAI MCP Gateway
 
 ```bash
+# Standalone gateway
 npx @virtue-ai/gateway-connect --gateway-url https://virtueai-agent-gtw-xxxx.ngrok.io
+
+# Platform-hosted gateway
+npx @virtue-ai/gateway-connect --gateway-url https://your-domain.ngrok.app/api/gateways/gtw_xxxx
 ```
 
 This will:
@@ -91,7 +95,9 @@ This approach works with any embedded model provider (not just Claude CLI), beca
 npx @virtue-ai/gateway-connect [options]
 
 Options:
-  --gateway-url <url>    Gateway URL (default: https://virtueai-agent-gtw-l3phon63.ngrok.io)
+  --gateway-url <url>    Gateway URL (standalone or platform-hosted)
+  --api-url <url>        Prompt-guard API URL (default: https://agentgateway1.virtueai.io)
+  --gateway-id <id>      Gateway ID for trajectory recording
   --model <model>        Model to use (e.g. openai/gpt-4o, anthropic/claude-sonnet-4-5)
   --guard-uuid <uuid>    Guard UUID for trajectory recording (or set VIRTUEAI_GUARD_UUID)
   --help                 Show help message

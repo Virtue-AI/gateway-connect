@@ -31,7 +31,7 @@ import { generateTrajectoryPlugin, enableTrajectoryPlugin } from './trajectory-p
 const CALLBACK_PORT = 19876;
 const CALLBACK_PATH = '/callback';
 const REDIRECT_URI = `http://localhost:${CALLBACK_PORT}${CALLBACK_PATH}`;
-const SCOPES = 'claudeai copilot mcp:read mcp:execute mcp:access';
+const DEFAULT_SCOPES = 'claudeai copilot mcp:read mcp:execute mcp:access';
 
 const OPENCLAW_DIR = path.join(os.homedir(), '.openclaw');
 const MCP_CONFIG_PATH = path.join(OPENCLAW_DIR, 'mcp-gateway.json');
@@ -125,7 +125,7 @@ async function authenticate(gatewayUrl: string): Promise<{
   console.log('  Discovering OAuth endpoints...');
   const { data: metadata } = await fetchJson(
     `${gatewayUrl}/.well-known/oauth-authorization-server`,
-    { method: 'GET' },
+    { method: 'GET', headers: { Accept: 'application/json' } },
   );
 
   if (!metadata.authorization_endpoint || !metadata.token_endpoint) {
@@ -137,9 +137,13 @@ async function authenticate(gatewayUrl: string): Promise<{
   const authEndpoint: string = metadata.authorization_endpoint;
   const tokenEndpoint: string = metadata.token_endpoint;
   const registerEndpoint: string = metadata.registration_endpoint;
+  const scopes: string = metadata.scopes_supported
+    ? metadata.scopes_supported.join(' ')
+    : DEFAULT_SCOPES;
 
   console.log(`  Auth endpoint: ${authEndpoint}`);
   console.log(`  Token endpoint: ${tokenEndpoint}`);
+  console.log(`  Scopes: ${scopes}`);
 
   console.log('  Registering OAuth client...');
   const { status: regStatus, data: clientInfo } = await fetchJson(registerEndpoint, {
@@ -149,7 +153,7 @@ async function authenticate(gatewayUrl: string): Promise<{
       client_name: 'openclaw-gateway-connect',
       grant_types: ['authorization_code', 'refresh_token'],
       redirect_uris: [REDIRECT_URI],
-      scope: SCOPES,
+      scope: scopes,
       token_endpoint_auth_method: 'none',
     }),
   });
@@ -171,7 +175,7 @@ async function authenticate(gatewayUrl: string): Promise<{
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
   authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', SCOPES);
+  authUrl.searchParams.set('scope', scopes);
   authUrl.searchParams.set('state', state);
   authUrl.searchParams.set('code_challenge', codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
